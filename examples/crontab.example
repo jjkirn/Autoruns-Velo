@@ -1,0 +1,10 @@
+# Adjust paths and the user to match your install.
+# Environment variables are optional; see README.md for the full list.
+AR_API_CONFIG=/opt/ar/api_client.yaml
+AR_DATA_DIR=/opt/ar/data
+
+# 02:00 start the hunt; 08:00 collect results and rebuild the reports.
+# Machines that were off at 02:00 report when they next check in; the hunt
+# stays open for 24 hours (AR_HUNT_HOURS), so a later collect picks them up.
+0 2 * * * /opt/ar/venv/bin/python /opt/ar/autoruns_delta.py launch
+0 8 * * * /opt/ar/venv/bin/python /opt/ar/autoruns_delta.py collect
