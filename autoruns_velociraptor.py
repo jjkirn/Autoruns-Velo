@@ -252,7 +252,11 @@ th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top;
 th{background:#f0f0f0}
 .ADDED{background:#e6f6e6} .REMOVED{background:#fbe7e7} .MODIFIED{background:#fff4d6}
 .note{background:#eef3fb;padding:8px 12px;border-radius:4px;margin:6px 0}
+.NEVER{background:#fbe7e7} .STALE{background:#fff4d6} .OK{background:#fff}
+table.summary{width:auto;min-width:50%}
 """
+
+STALE_HOURS = 48
 
 
 def esc(v):
@@ -307,7 +311,26 @@ def write_delta(path, run_stamp, per_host, notes):
     Path(path).write_text("\n".join(parts), encoding="utf-8")
 
 
-def write_history(path, conn):
+def host_summary_rows(conn, known_hosts):
+    """One row per host: status, last successful run, entry count, recent changes."""
+    runs = dict(conn.execute("SELECT host, last_success FROM host_runs"))
+    entries = dict(conn.execute("SELECT host, COUNT(*) FROM baseline GROUP BY host"))
+    counts = dict(conn.execute("SELECT host, COUNT(*) FROM changes GROUP BY host"))
+    now = dt.datetime.now(dt.timezone.utc)
+    out = []
+    for host in sorted(set(known_hosts) | set(runs), key=str.lower):
+        last = runs.get(host)
+        if not last:
+            out.append(("NEVER", host, "never collected", "-", "-"))
+            continue
+        age = now - dt.datetime.strptime(last, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=dt.timezone.utc)
+        status = "STALE" if age > dt.timedelta(hours=STALE_HOURS) else "OK"
+        out.append((status, host, last, entries.get(host, 0), counts.get(host, 0)))
+    return out
+
+
+def write_history(path, conn, known_hosts=()):
     rows = conn.execute(
         "SELECT host, detected, change_type, key, data, detail FROM changes "
         "ORDER BY detected DESC, id DESC"
@@ -317,7 +340,18 @@ def write_history(path, conn):
         "<style>%s</style>" % CSS,
         "<h1>Autoruns history</h1>",
         "<div class='sub'>Changes from the last %d days, newest first</div>" % HISTORY_DAYS,
+        "<h2>Hosts</h2>",
+        "<table class='summary'><tr><th>Host</th><th>Last successful run (UTC)</th>"
+        "<th>Entries</th><th>Changes in last %d days</th></tr>" % HISTORY_DAYS,
     ]
+    for status, host, last, n_entries, n_changes in host_summary_rows(conn, known_hosts):
+        parts.append(
+            "<tr class='%s'><td>%s</td><td>%s%s</td><td>%s</td><td>%s</td></tr>"
+            % (status, esc(host), esc(last),
+               " (stale)" if status == "STALE" else "", esc(n_entries), esc(n_changes))
+        )
+    parts.append("</table>")
+    parts.append("<h2>Changes</h2>")
     if not rows:
         parts.append("<p>No changes recorded.</p>")
     else:
@@ -366,10 +400,12 @@ def main():
     wanted = {h.strip().lower() for h in args.hosts.split(",")} if args.hosts else None
     now_us = time.time() * 1e6
     targets = {}  # hostname -> client_id
+    known_hosts = set()  # every Windows client the server knows, for the summary
     for c in list_clients(velo):
         host = c.get("hostname") or c.get("client_id")
         if str(c.get("os", "")).lower() != "windows":
             continue
+        known_hosts.add(host)
         if wanted and host.lower() not in wanted:
             continue
         online = (now_us - float(c.get("last_seen_at") or 0)) < args.online_window * 1e6
@@ -424,7 +460,7 @@ def main():
 
     prune_history(conn)
     write_delta(out_dir / "delta.html", stamp, per_host, notes)
-    write_history(out_dir / "history.html", conn)
+    write_history(out_dir / "history.html", conn, known_hosts)
     velo.close()
     print("wrote %s and %s" % (out_dir / "delta.html", out_dir / "history.html"))
     return 0
@@ -432,4 +468,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-    
