@@ -1,10 +1,7 @@
-# Adjust paths and the user to match your install.
-# Environment variables are optional; see README.md for the full list.
-AR_API_CONFIG=/opt/ar/api_client.yaml
-AR_DATA_DIR=/opt/ar/data
-
-# 02:00 start the hunt; 08:00 collect results and rebuild the reports.
-# Machines that were off at 02:00 report when they next check in; the hunt
-# stays open for 24 hours (AR_HUNT_HOURS), so a later collect picks them up.
-0 2 * * * /opt/ar/venv/bin/python /opt/ar/autoruns_delta.py launch
-0 8 * * * /opt/ar/venv/bin/python /opt/ar/autoruns_delta.py collect
+# Adjust the path and time to match your install.
+# Edit with: crontab -e   (as the user that owns the repo and api.config.yaml)
+#
+# Nightly Autoruns collection and report refresh at 02:00.
+# Output goes to nightly.log in the repo folder (see run_nightly.sh).
+# Calling bash explicitly means the script does not need the executable bit.
+0 2 * * * /bin/bash /home/jim/git/autoruns-velo/run_nightly.sh
