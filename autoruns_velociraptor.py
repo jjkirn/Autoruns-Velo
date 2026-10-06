@@ -233,7 +233,7 @@ def apply_run(conn, host, new_snap, changes, stamp, first_run):
 
 
 def prune_history(conn):
-    cutoff = (dt.datetime.utcnow() - dt.timedelta(days=HISTORY_DAYS)).strftime(
+    cutoff = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=HISTORY_DAYS)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
     with conn:
@@ -360,7 +360,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     conn = init_db(args.db)
     velo = Velo(args.api_config)
-    stamp = dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     notes = []
 
     wanted = {h.strip().lower() for h in args.hosts.split(",")} if args.hosts else None
