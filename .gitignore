@@ -14,3 +14,8 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+api.config.yaml
+*.config.yaml
+*.sqlite
+reports/
+__pycache__/
