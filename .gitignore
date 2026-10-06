@@ -1,21 +1,21 @@
 # Secrets: contains a private key that can control the Velociraptor server
+api.config.yaml
+*.config.yaml
 api_client*.yaml
 *.conf.yaml
 
 # Runtime data (lists autostart entries on your machines)
 data/
+reports/
 *.db
+*.sqlite
 state.json
 delta.html
 history.html
+nightly.log
 
 # Python
-venv/
 .venv/
+venv/
 __pycache__/
 *.pyc
-api.config.yaml
-*.config.yaml
-*.sqlite
-reports/
-__pycache__/

@@ -1,114 +1,162 @@
-# Velociraptor Autoruns Delta
+# Autoruns Velo
 
-Nightly reports of what changed in the Windows autostart locations (Sysinternals Autoruns) on machines you are authorized to monitor. Collection is done by [Velociraptor](https://docs.velociraptor.app/); this script launches the hunt through the Velociraptor API, compares the results against a per-host baseline, and writes two web pages:
+Nightly reports of what changed in the Windows autostart locations (Sysinternals Autoruns) on machines you are authorized to monitor.
 
-- `delta.html`: each host's current differences from its baseline.
-- `history.html`: a searchable log of day-to-day changes, kept for 30 days by default.
+[Velociraptor](https://docs.velociraptor.app/) collects the data. `autoruns_velociraptor.py` asks the Velociraptor server (through its API) to run the built-in `Windows.Sysinternals.Autoruns` artifact on each online Windows client, compares the results with the previous run, and writes two web pages:
 
-This is a rewrite of an earlier project, [Autoruns-Powershell](https://github.com/jjkirn/Autoruns-Powershell), which used PowerShell remoting, a MySQL database and Apache. This version uses Velociraptor for collection and Python with SQLite for storage, so there is no separate database server or web-page upload step.
+- `delta.html`: what changed in this run, per host.
+- `history.html`: every change recorded in the last 30 days, newest first.
 
-> **Status: prototype.** The code has not been tested end to end. The Velociraptor function and column names in `autoruns_delta.py` were written from documentation and should be verified against your server version (see [Things to verify](#things-to-verify)).
+This is the Velociraptor-based successor to [Autoruns-Powershell](https://github.com/jjkirn/Autoruns-Powershell), which used PowerShell remoting, MySQL and Apache. Storage is a single SQLite file, and there is no database server or web upload step.
 
 > **Use only on systems you are authorized to monitor.**
+
+**Status:** tested end to end against a Velociraptor server with Windows 10 and Windows 11 clients (agent 0.75.6). Baseline creation and the "no changes" run have been verified. Different server versions may need small adjustments (see [Troubleshooting](#troubleshooting)).
 
 ## How it works
 
 ```
-Velociraptor clients (Windows)  <--  hunt: Windows.Sysinternals.Autoruns
-            |
-   Velociraptor server  --gRPC API-->  autoruns_delta.py (cron)
-                                            |
-                              data/autoruns.db (SQLite)
-                              data/delta.html, data/history.html
+Velociraptor clients (Windows)
+        ^   Windows.Sysinternals.Autoruns
+        |
+Velociraptor server  <--gRPC API-->  autoruns_velociraptor.py
+                                          |
+                                autoruns.sqlite   reports/delta.html
+                                                  reports/history.html
 ```
 
-1. `launch` starts a hunt of the built-in `Windows.Sysinternals.Autoruns` artifact. The server downloads `autorunsc` and serves it to the clients, so nothing extra needs installing on the target machines. Hunts stay open for 24 hours, so machines that were off at launch report when they next check in.
-2. `collect` pulls the hunt's results through the API and compares them with each host's stored baseline. A host's first result becomes its baseline.
-3. Each entry is identified by its category, profile, name, image path and launch string. A change in signer or hash on the same entry is reported as CHANGED, which avoids false alarms from routine updates changing a file hash.
-4. Hosts that did not report are listed separately instead of being treated as having removed all their entries.
+1. The script lists the server's Windows clients. Clients not seen in the last 10 minutes are skipped and noted in `delta.html`.
+2. It starts the Autoruns collection on every online client at the same time and waits for them to finish (default timeout: 15 minutes).
+3. Each result is compared with that host's stored snapshot from its previous successful run. A host's first run only creates its baseline.
+4. Differences are stored in a change log, entries older than 30 days are pruned, and both reports are rewritten.
 
-The database holds three tables: `baseline` (what you accepted as normal), `last_run` (the previous result, used to log only new day-to-day changes), and `delta_log` (the rolling change history).
+### What counts as a change
+
+Each autorun entry is identified by its **Entry Location + Entry + Image Path + Launch String**. Then:
+
+| Change | Meaning |
+|---|---|
+| ADDED | An entry with a new identity appeared |
+| REMOVED | An entry with that identity is no longer present |
+| MODIFIED | Same identity, but one of these fields differs: SHA-256, MD5, Signer, Company, Version, Enabled, Category |
+
+The `Time` column is ignored, since it changes whenever an entry is edited. Rows with no identity fields at all are skipped, and exact duplicates are merged, so the entry count is a few lower than the raw row count.
+
+The "baseline" is the host's previous successful run, not a manually approved state. After every successful run it is replaced with the latest snapshot, so a change is reported once, on the run that first sees it, and stays in `history.html` for 30 days. A run that returns 0 rows leaves the baseline unchanged.
 
 ## Requirements
 
-- A running Velociraptor server with Windows clients enrolled
+- A Velociraptor server with Windows clients enrolled
 - Python 3.9 or later on the machine that runs the script (the Velociraptor server itself works)
-- `pip install -r requirements.txt`
+- `pyvelociraptor` and `pyyaml` (`requirements.txt`)
 
 ## Setup
 
-1. Create a Python environment and install dependencies:
+### 1. Python environment
 
-   ```
-   python3 -m venv venv && venv/bin/pip install -r requirements.txt
-   ```
+On Ubuntu/Debian you need the venv package first:
 
-2. Create an API client config on the Velociraptor server:
+```
+sudo apt install -y python3-venv
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-   ```
-   velociraptor --config /etc/velociraptor/server.config.yaml \
-     config api_client --name autoruns --role api,investigator api_client.yaml
-   chmod 600 api_client.yaml
-   ```
+### 2. API client config
 
-   The `api,investigator` roles are my best understanding of the minimum needed to start hunts and read results. If you get a permission error, try `administrator` temporarily to confirm. The API listens on loopback by default; do not expose its port.
+On the Velociraptor server, create an API client certificate. Run the command as the `velociraptor` service user, write to `/tmp`, then move the file into place:
 
-3. Optional: label the machines you want to monitor in the Velociraptor GUI (select them in the client list and use Add label), then set `AR_LABEL` to that label. Without a label, every Windows client the server knows about is included.
+```
+sudo -u velociraptor velociraptor --config /etc/velociraptor/server.config.yaml \
+  config api_client --name autoruns_api --role api,investigator /tmp/api.config.yaml
+sudo mv /tmp/api.config.yaml ~/autoruns-velo/api.config.yaml
+sudo chown $USER:$USER ~/autoruns-velo/api.config.yaml
+chmod 600 ~/autoruns-velo/api.config.yaml
+```
 
-4. Run `launch`, then `collect` once hosts have reported:
+Adjust the paths to your install. The `api_connection_string` in the file is the address the script connects to (usually `127.0.0.1:8001`). Do not expose that port.
 
-   ```
-   venv/bin/python autoruns_delta.py launch
-   venv/bin/python autoruns_delta.py collect
-   ```
+### 3. Grant the API user its role and restart
+
+Creating the certificate does not create the user on the server. Without this step the script fails with `User not found: autoruns_api`.
+
+```
+sudo -u velociraptor velociraptor --config /etc/velociraptor/server.config.yaml \
+  acl grant autoruns_api --role api,investigator
+sudo systemctl restart velociraptor_server
+```
+
+The service name may differ on your install (`systemctl list-units | grep -i velo`). Clients reconnect on their own within a minute or so.
+
+### 4. First run
+
+Test on one host first:
+
+```
+python3 autoruns_velociraptor.py --api-config api.config.yaml --hosts HOSTNAME --dump-columns
+```
+
+This prints the result column names, creates the baseline, and writes the reports. Run it a second time and it should report `0 changes`.
 
 ## Usage
 
 ```
-autoruns_delta.py launch                      # start tonight's hunt
-autoruns_delta.py collect [--rebaseline]      # pull results, update reports
-autoruns_delta.py history [--host H] [--days N] [--change added|removed|changed]
-autoruns_delta.py history-html [--days N]     # rebuild history.html on demand
+python3 autoruns_velociraptor.py --api-config api.config.yaml [options]
 ```
 
-Run `collect --rebaseline` after you have reviewed a host's changes and want to accept them as the new normal. Re-baselining does not touch the history.
-
-Schedule with cron; see `examples/crontab.example`.
-
-## Settings
-
-All optional, set as environment variables:
-
-| Variable | Default | Meaning |
+| Option | Default | Meaning |
 |---|---|---|
-| `AR_API_CONFIG` | `api_client.yaml` | Path to the Velociraptor API client config |
-| `AR_DATA_DIR` | `data` | Where the database and HTML reports are written |
-| `AR_KEEP_DAYS` | `30` | Days of change history to keep |
-| `AR_LABEL` | (none) | Only hunt clients with this Velociraptor label |
-| `AR_HUNT_HOURS` | `24` | How long a hunt stays open for late hosts |
+| `--api-config` | (required) | Path to the Velociraptor `api.config.yaml` |
+| `--db` | `autoruns.sqlite` | SQLite database (baselines and change log) |
+| `--out-dir` | `reports` | Where `delta.html` and `history.html` are written |
+| `--hosts` | all Windows clients | Comma-separated host names to include |
+| `--timeout` | `900` | Seconds to wait for collections to finish |
+| `--online-window` | `600` | A client counts as online if seen within this many seconds |
+| `--dump-columns` | off | Print the first result row's column names |
 
-## Things to verify
+## Nightly schedule
 
-These parts were written from documentation and are the most likely to need adjustment:
+`run_nightly.sh` wraps the script with absolute paths and logs to `nightly.log`. See `examples/crontab.example` for the cron line.
 
-- `hunt_flows(hunt_id=...)` should return `ClientId` and `FlowId` columns. Check with `SELECT * FROM hunt_flows(hunt_id='H.XXXX') LIMIT 1`.
-- The `hunt()` function returns an object containing the hunt ID. The script accepts `hunt_id` or `HuntId`.
-- The `include_labels` parameter name on `hunt()` (used when `AR_LABEL` is set).
-- The column names in the Autoruns results: `Entry`, `Category`, `Profile`, `Image Path`, `Launch String`, `SHA-256`, `Signer`.
-- If the results contain only system-wide entries and no per-user ones, check the `AutorunsArgs` parameter default of the artifact for a stray newline. This was a bug in an old Velociraptor version.
-- If your server has multiple orgs, the API request needs an `org_id`.
+Note that a machine that is switched off at run time is skipped that night. Pick a time your machines are usually on.
+
+## Viewing the reports
+
+The reports list every changed autostart entry on your machines. Serve them only on a trusted network or behind authentication. For a quick look from another machine:
+
+```
+cd reports && python3 -m http.server 8080
+```
 
 ## Security notes
 
-- `api_client.yaml` contains a private key that can control your Velociraptor server. Keep it out of version control (it is in `.gitignore`) and readable only by the account that runs the script.
-- The generated pages list every autostart entry that changed on your machines. Serve them only on a trusted network or behind authentication.
+- `api.config.yaml` contains a private key that can control your Velociraptor server. It is excluded by `.gitignore`. Keep it readable only by the account that runs the script (`chmod 600`).
+- `autoruns.sqlite` and `reports/` contain your hosts' startup entries and are also excluded from git.
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| `User not found: autoruns_api` | Step 3 is missing: grant the role and restart the server |
+| `externally-managed-environment` from pip | Use the virtual environment from step 1 |
+| `Velociraptor should be running as the 'velociraptor' user` | Run the `config api_client` command with `sudo -u velociraptor` |
+| Host listed as offline in `delta.html` | The client was not seen within `--online-window`; run when it is on |
+| `collection returned 0 rows` | The baseline is left unchanged; check the flow's Logs tab in the GUI |
+| Different column names | Run with `--dump-columns` and edit `KEY_FIELDS` and `WATCH_FIELDS` at the top of the script |
 
 ## Limitations
 
-- Baselines and history only cover hosts that reported. A host that is off for several days appears in the "No data from" list.
+- Hosts that are offline are skipped, not queued. They are compared against their previous run the next time they are online.
+- Only the most recent run is shown in `delta.html`. Earlier changes are in `history.html`.
 - History for a host starts on its second run.
-- `run_date` is the date the data was collected, not the date the change happened.
+- The detection date is when the change was collected, not when it happened on the machine.
+- Several hosts at once can be slow on a small server, since each collection runs the full Autoruns scan.
+
+## Legacy script
+
+`autoruns_delta.py` is an earlier, untested design that launches a single Velociraptor hunt (`launch` then `collect`) instead of per-host collections. It is kept for reference and is not documented here.
 
 ## License
 
-Not yet chosen.
+Apache License 2.0. See [LICENSE](LICENSE).
