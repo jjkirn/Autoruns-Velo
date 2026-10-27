@@ -7,6 +7,10 @@ Nightly reports of what changed in the Windows autostart locations (Sysinternals
 - `delta.html`: what changed in this run, per host.
 - `history.html`: every change recorded in the last 30 days, newest first.
 
+`chart_report.py` then builds a third page from the same database:
+
+- `chart.html`: a stacked-bar time series for each host. Click a segment to list that day's changes below the charts.
+
 This is the Velociraptor-based successor to [Autoruns-Powershell](https://github.com/jjkirn/Autoruns-Powershell), which used PowerShell remoting, MySQL and Apache. Storage is a single SQLite file, and there is no database server or web upload step.
 
 > **Use only on systems you are authorized to monitor.**
@@ -22,7 +26,8 @@ Velociraptor clients (Windows)
 Velociraptor server  <--gRPC API-->  autoruns_velociraptor.py
                                           |
                                 autoruns.sqlite   reports/delta.html
-                                                  reports/history.html
+                                      |           reports/history.html
+                              chart_report.py     reports/chart.html
 ```
 
 1. The script lists the server's Windows clients. Clients not seen in the last 10 minutes are skipped and noted in `delta.html`.
@@ -115,9 +120,28 @@ python3 autoruns_velociraptor.py --api-config api.config.yaml [options]
 | `--online-window` | `600` | A client counts as online if seen within this many seconds |
 | `--dump-columns` | off | Print the first result row's column names |
 
+## Chart page
+
+```
+python3 chart_report.py --db autoruns.sqlite --out reports/chart.html
+```
+
+It only reads the SQLite database and uses the Python standard library, so it needs no extra packages and no Velociraptor connection. The page is a single file with the data embedded.
+
+- One stacked-bar chart per host, one bar per day (last 7, 14 or 30 days).
+- Stack by change type (Added, Removed, Modified) or by Autoruns category.
+- Click a segment to list its changes below the charts, with the same columns as `history.html` plus Category. Click another segment and the list is replaced. Click the empty part of a day column for every change that day.
+- A table view of the same counts is available for screen readers and printing.
+- Each category has a fixed colour taken from `CATEGORY_ORDER` at the top of `chart_report.py`; other categories are grouped as "Other".
+- Days are counted by when the change was collected (see Limitations), shown in the viewer's time zone.
+
+The nightly script rebuilds it after each run. Serve it with the other reports.
+
+**Run markers.** The script records every attempt per host (ok, baseline, offline, error, timeout, no_data) in a `runs` table. The chart uses it to show a small dash on days a host ran with no changes, and an "x" on days it did not run. History starts from the first run after this table was added; days before that have no marker.
+
 ## Nightly schedule
 
-`run_nightly.sh` wraps the script with absolute paths and logs to `nightly.log`. See `examples/crontab.example` for the cron line.
+`run_nightly.sh` wraps the script (and the chart rebuild) with absolute paths and logs to `nightly.log`. See `examples/crontab.example` for the cron line.
 
 Note that a machine that is switched off at run time is skipped that night. Pick a time your machines are usually on.
 
@@ -150,6 +174,7 @@ cd reports && python3 -m http.server 8080
 - Hosts that are offline are skipped, not queued. They are compared against their previous run the next time they are online.
 - Only the most recent run is shown in `delta.html`. Earlier changes are in `history.html`.
 - History for a host starts on its second run.
+- On the chart, bar segments under 4 px are drawn at 4 px so they stay clickable.
 - The detection date is when the change was collected, not when it happened on the machine.
 - Several hosts at once can be slow on a small server, since each collection runs the full Autoruns scan.
 

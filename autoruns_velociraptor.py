@@ -200,9 +200,28 @@ def init_db(path):
             last_success TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_changes_detected ON changes(detected);
+        CREATE TABLE IF NOT EXISTS runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            host TEXT NOT NULL,
+            run_at TEXT NOT NULL,
+            status TEXT NOT NULL,
+            entries INTEGER,
+            note TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_runs_host ON runs(host, run_at);
         """
     )
     return conn
+
+
+def record_run(conn, host, stamp, status, entries=None, note=""):
+    """Log one attempt for a host: ok, baseline, offline, error, timeout or no_data.
+    chart_report.py uses this to tell a quiet day from a day the host never ran."""
+    with conn:
+        conn.execute(
+            "INSERT INTO runs (host, run_at, status, entries, note) VALUES (?,?,?,?,?)",
+            (host, stamp, status, entries, note),
+        )
 
 
 def load_baseline(conn, host):
@@ -238,6 +257,7 @@ def prune_history(conn):
     )
     with conn:
         conn.execute("DELETE FROM changes WHERE detected < ?", (cutoff,))
+        conn.execute("DELETE FROM runs WHERE run_at < ?", (cutoff,))
 
 
 # --------------------------------------------------------------------------
@@ -411,6 +431,7 @@ def main():
         online = (now_us - float(c.get("last_seen_at") or 0)) < args.online_window * 1e6
         if not online:
             notes.append("%s was offline and skipped this run." % host)
+            record_run(conn, host, stamp, "offline")
             continue
         targets[host] = c["client_id"]
 
@@ -422,6 +443,7 @@ def main():
             print("started %s on %s (%s)" % (ARTIFACT, host, flows[host]))
         except Exception as e:
             notes.append("%s: could not start collection (%s)" % (host, e))
+            record_run(conn, host, stamp, "error", note="could not start collection")
 
     # Poll until all finish or the timeout hits.
     pending = dict(flows)
@@ -434,11 +456,13 @@ def main():
                 done[host] = pending.pop(host)
             elif state == "ERROR":
                 notes.append("%s: collection ended in ERROR." % host)
+                record_run(conn, host, stamp, "error", note="collection ended in ERROR")
                 pending.pop(host)
         if pending:
             time.sleep(5)
     for host in pending:
         notes.append("%s: collection did not finish within %ds." % (host, args.timeout))
+        record_run(conn, host, stamp, "timeout")
 
     per_host = {}
     for host, flow_id in done.items():
@@ -447,12 +471,14 @@ def main():
             print("columns:", list(rows[0].keys()))
         if not rows:
             notes.append("%s: collection returned 0 rows; baseline left unchanged." % host)
+            record_run(conn, host, stamp, "no_data", 0)
             continue
         new_snap = snapshot(rows)
         old_snap = load_baseline(conn, host)
         first_run = not old_snap
         changes = [] if first_run else diff(old_snap, new_snap)
         apply_run(conn, host, new_snap, changes, stamp, first_run)
+        record_run(conn, host, stamp, "baseline" if first_run else "ok", len(new_snap))
         per_host[host] = (changes, first_run)
         print("%s: %d entries, %s" % (
             host, len(new_snap),

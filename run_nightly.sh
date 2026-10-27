@@ -10,5 +10,10 @@ cd "$DIR" || exit 1
     --api-config "$DIR/api.config.yaml" \
     --db "$DIR/autoruns.sqlite" \
     --out-dir "$DIR/reports"
-  echo "=== exit code $? ==="
+  rc=$?
+  # Rebuild the chart page from the updated database (reads only, no network).
+  "$DIR/.venv/bin/python3" chart_report.py \
+    --db "$DIR/autoruns.sqlite" \
+    --out "$DIR/reports/chart.html"
+  echo "=== exit code $rc ==="
 } >> "$DIR/nightly.log" 2>&1
