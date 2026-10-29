@@ -212,6 +212,12 @@ cd reports && python3 -m http.server 8080
 
 `autoruns_delta.py` is an earlier, untested design that launches a single Velociraptor hunt (`launch` then `collect`) instead of per-host collections. It is kept for reference and is not documented here.
 
+## Acknowledgments
+
+Built with help from Claude (Anthropic), which assisted with the code, the chart
+and unsigned-entries pages, and the documentation. Tested and run by the author
+on his own hosts.
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
