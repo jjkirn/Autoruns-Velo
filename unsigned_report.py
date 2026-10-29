@@ -13,7 +13,9 @@ Signer classes (from the Signer text Velociraptor reports):
   No signature       Signer is empty and the entry has an Image Path
   Invalid signature  Signer starts with "(Not verified)": a signature is present
                      but does not validate (e.g. claims "Microsoft Corporation")
-  No file            Signer is empty and there is no Image Path (nothing to sign)
+  No file            Signer is empty and there is no Image Path (nothing to sign), or
+                     the Image Path is an Autoruns "File not found: ..." placeholder
+                     (a stale autostart entry whose file is gone from disk)
 
 It only READS the SQLite database written by autoruns_velociraptor.py and needs
 nothing beyond the Python standard library. No data leaves your machine; the
@@ -54,7 +56,9 @@ def classify(rec):
     if signer.lower().startswith("(not verified)"):
         return "invalid"
     if not signer:
-        return "none" if image else "nofile"
+        if not image or image.lower().startswith("file not found"):
+            return "nofile"
+        return "none"
     return None
 
 
@@ -291,7 +295,7 @@ var D = JSON.parse(document.getElementById('data').textContent);
 var CLASSES = [
   {key:'none',    label:'No signature',      hint:'Signer is empty and the entry points at a file'},
   {key:'invalid', label:'Invalid signature', hint:'Signature present but not verified'},
-  {key:'nofile',  label:'No file',           hint:'Signer is empty and there is no Image Path'}
+  {key:'nofile',  label:'No file',           hint:'No Image Path, or Autoruns reports the file as not found'}
 ];
 var CLS = {}; CLASSES.forEach(function(c){ CLS[c.key] = c; });
 var TYPES = ['ADDED','MODIFIED','REMOVED'];
