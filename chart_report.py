@@ -246,7 +246,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   <header>
     <h1>Autoruns change chart</h1>
     <div class="sub" id="gen"></div>
-    <nav><a href="history.html">History</a><a href="delta.html">Last run</a></nav>
+    <nav><a href="unsigned.html">Unsigned</a><a href="history.html">History</a><a href="delta.html">Last run</a></nav>
   </header>
   <div class="card controls" id="controls"></div>
   <div class="card" id="chartcard">

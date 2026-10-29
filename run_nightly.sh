@@ -15,5 +15,9 @@ cd "$DIR" || exit 1
   "$DIR/.venv/bin/python3" chart_report.py \
     --db "$DIR/autoruns.sqlite" \
     --out "$DIR/reports/chart.html"
+  # Rebuild the unsigned-entries page (also read-only).
+  "$DIR/.venv/bin/python3" unsigned_report.py \
+    --db "$DIR/autoruns.sqlite" \
+    --out "$DIR/reports/unsigned.html"
   echo "=== exit code $rc ==="
 } >> "$DIR/nightly.log" 2>&1

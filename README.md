@@ -139,6 +139,36 @@ The nightly script rebuilds it after each run. Serve it with the other reports.
 
 **Run markers.** The script records every attempt per host (ok, baseline, offline, error, timeout, no_data) in a `runs` table. The chart uses it to show a small dash on days a host ran with no changes, and an "x" on days it did not run. History starts from the first run after this table was added; days before that have no marker.
 
+## Unsigned page
+
+`unsigned_report.py` builds `reports/unsigned.html`, a page that lists entries
+with no trustworthy code signature so they are not lost on a day with hundreds
+of changes. Like the chart page it only reads the SQLite database.
+
+```bash
+python3 unsigned_report.py --db autoruns.sqlite --out reports/unsigned.html
+```
+
+Signer classes:
+
+| Class | Meaning |
+| --- | --- |
+| No signature | Signer is empty and the entry points at a file |
+| Invalid signature | Signer starts with `(Not verified)`: a signature is present but does not validate |
+| No file | Signer is empty and there is no Image Path (nothing to sign); hidden by default |
+
+Two views: **Changes** (added, modified or removed entries, with a per-day count
+picker and a "Signer changed" badge when a signed entry became unsigned) and
+**Current inventory** (every unsigned entry now, with first-seen date and how
+many hosts carry the same file hash). SHA-256 values link to VirusTotal; the
+link is only followed if you click it.
+
+To hide known-harmless items, copy `unsigned_ignore.txt.example` to
+`unsigned_ignore.txt` next to `autoruns.sqlite` and list patterns (one per line,
+`*` and `?` wildcards, matched against Image Path or Launch String). Ignored
+entries stay available behind the "Show ignored" switch. `run_nightly.sh`
+rebuilds the page after every run.
+
 ## Nightly schedule
 
 `run_nightly.sh` wraps the script (and the chart rebuild) with absolute paths and logs to `nightly.log`. See `examples/crontab.example` for the cron line.
