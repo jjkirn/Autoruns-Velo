@@ -7,15 +7,16 @@ Nightly reports of what changed in the Windows autostart locations (Sysinternals
 - `delta.html`: what changed in this run, per host.
 - `history.html`: every change recorded in the last 30 days, newest first.
 
-`chart_report.py` then builds a third page from the same database:
+Two more scripts build further pages from the same database (read-only, no Velociraptor connection):
 
-- `chart.html`: a stacked-bar time series for each host. Click a segment to list that day's changes below the charts.
+- `chart_report.py` writes `chart.html`: a stacked-bar time series for each host. Click a segment to list that day's changes below the charts.
+- `unsigned_report.py` writes `unsigned.html`: entries with no trustworthy code signature, so they are not lost on a day with hundreds of changes.
 
 This is the Velociraptor-based successor to [Autoruns-Powershell](https://github.com/jjkirn/Autoruns-Powershell), which used PowerShell remoting, MySQL and Apache. Storage is a single SQLite file, and there is no database server or web upload step.
 
 > **Use only on systems you are authorized to monitor.**
 
-**Status:** tested end to end against a Velociraptor server with Windows 10 and Windows 11 clients (agent 0.75.6). Baseline creation and the "no changes" run have been verified. Different server versions may need small adjustments (see [Troubleshooting](#troubleshooting)).
+**Status:** tested end to end against a Velociraptor server with Windows 10 and Windows 11 clients (agent 0.75.6). Baselines, "no changes" runs, multi-host runs and a nightly cron schedule have been running on the author's hosts. Different server versions may need small adjustments (see [Troubleshooting](#troubleshooting)).
 
 ## How it works
 
@@ -27,7 +28,9 @@ Velociraptor server  <--gRPC API-->  autoruns_velociraptor.py
                                           |
                                 autoruns.sqlite   reports/delta.html
                                       |           reports/history.html
-                              chart_report.py     reports/chart.html
+                                      |
+                                      +-- chart_report.py     -> reports/chart.html
+                                      +-- unsigned_report.py  -> reports/unsigned.html
 ```
 
 1. The script lists the server's Windows clients. Clients not seen in the last 10 minutes are skipped and noted in `delta.html`.
@@ -155,9 +158,11 @@ Signer classes:
 | --- | --- |
 | No signature | Signer is empty and the entry points at a file |
 | Invalid signature | Signer starts with `(Not verified)`: a signature is present but does not validate |
-| No file | Signer is empty and there is no Image Path (nothing to sign); hidden by default |
+| No file | Nothing to sign: there is no Image Path, or Autoruns reports `File not found: ...` for it (a stale autostart entry whose file is gone). Hidden by default |
 
-Two views: **Changes** (added, modified or removed entries, with a per-day count
+The page opens with a per-host overview table (click a host to filter), then
+the controls: view, class and change-type toggles, a 7/14/30-day range, a day
+picker and a text filter. Two views: **Changes** (added, modified or removed entries, with a per-day count
 picker and a "Signer changed" badge when a signed entry became unsigned) and
 **Current inventory** (every unsigned entry now, with first-seen date and how
 many hosts carry the same file hash). SHA-256 values link to VirusTotal; the
@@ -166,12 +171,24 @@ link is only followed if you click it.
 To hide known-harmless items, copy `unsigned_ignore.txt.example` to
 `unsigned_ignore.txt` next to `autoruns.sqlite` and list patterns (one per line,
 `*` and `?` wildcards, matched against Image Path or Launch String). Ignored
-entries stay available behind the "Show ignored" switch. `run_nightly.sh`
-rebuilds the page after every run.
+entries stay available behind the "Show ignored" switch. Use `--ignore PATH`
+to read the list from another location. `run_nightly.sh` rebuilds the page
+after every run.
+
+Prefer patterns for specific files (`c:\program files\7-zip\7z.dll`) over
+whole folders (`c:\program files\7-zip\*`): a folder-wide pattern would also
+hide a malicious file dropped into that folder later.
+
+**Stale "No file" entries.** Windows does not remove an autostart entry when
+its file disappears, so uninstalled software often leaves them behind. They are
+usually harmless, but this tool only reports. To clean them up, use the
+Sysinternals Autoruns GUI (`Autoruns64.exe`, run as administrator): rows for
+missing files are highlighted yellow. Untick an entry to disable it, or delete
+it once you are sure. The next nightly run reports the removals as REMOVED.
 
 ## Nightly schedule
 
-`run_nightly.sh` wraps the script (and the chart rebuild) with absolute paths and logs to `nightly.log`. See `examples/crontab.example` for the cron line.
+`run_nightly.sh` wraps the script (and the chart and unsigned-page rebuilds) with absolute paths and logs to `nightly.log`. See `examples/crontab.example` for the cron line.
 
 Note that a machine that is switched off at run time is skipped that night. Pick a time your machines are usually on.
 
@@ -205,6 +222,7 @@ cd reports && python3 -m http.server 8080
 - Only the most recent run is shown in `delta.html`. Earlier changes are in `history.html`.
 - History for a host starts on its second run.
 - On the chart, bar segments under 4 px are drawn at 4 px so they stay clickable.
+- The unsigned page can only judge what Autoruns reports. An entry with a valid signature from a signer you do not trust still counts as signed.
 - The detection date is when the change was collected, not when it happened on the machine.
 - Several hosts at once can be slow on a small server, since each collection runs the full Autoruns scan.
 
