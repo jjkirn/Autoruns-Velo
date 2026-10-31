@@ -25,3 +25,19 @@ C:\Program Files\RustDesk\RustDesk.exe  #RustDesk software for Remote Desktop ac
 C:\Program Files\AESCrypt\AESCrypt.dll	#official AES Crypt file encryption software for Windows
 C:\Program Files\Npcap\CheckStatus.bat	#legitimate, automated script installed as part of Npcap (by the Nmap Project)
 C:\WINDOWS\system32\pdfcmon.dll	#legitimate monitor Dynamic Link Library (DLL) file developed by pdfforge GmbH as part of the PDFCreator softwarei
+
+# Bluetooth drivers (Microsoft inbox, catalog-signed)
+C:\WINDOWS\System32\drivers\bthmodem.sys	#Microsoft Bluetooth modem driver
+C:\WINDOWS\System32\drivers\BthA2dp.sys	#Microsoft Bluetooth audio driver
+C:\WINDOWS\System32\drivers\bthhfenum.sys	#Microsoft Bluetooth hands-free driver
+
+# Vendor software
+C:\Program Files\Intel\Intel(R) Rapid Storage Technology\IAStorIconLaunch.exe	#Intel Rapid Storage tray icon
+C:\Program Files\LogiDownloadAssistant\bin\logi_download_assistant.exe	#Logitech download assistant
+C:\WINDOWS\system32\CNMN6PPM.DLL	#Canon BJNP print port monitor
+C:\Program Files (x86)\Incredibuild\Dashboard\Apache24\bin\httpd.exe	#Incredibuild dashboard web server (Apache)
+C:\mongodb\bin\mongod.exe	#MongoDB service
+
+# Not ignored yet - verify first (remove the leading # once checked)
+#C:\Program Files (x86)\MSI\MSI Remind Manager\MSISCMTsk.exe	#signer shows as "Application"
+#C:\WINDOWS\system32\pdf995mon64.dll	#PDF995 print monitor, no signer name
