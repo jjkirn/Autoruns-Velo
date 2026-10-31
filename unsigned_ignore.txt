@@ -1,0 +1,9 @@
+# One pattern per line, matched case-insensitively against Image Path or
+# Launch String. * and ? are wildcards. Copy to unsigned_ignore.txt (next to
+# autoruns.sqlite) and edit. Ignored entries are hidden by default and come back
+# with the "Show ignored" switch on the page.
+#
+# c:\tools\my-inhouse-script.exe
+c:\program files\7-zip\*
+c:\program files (x86)\common files\adobe systems shared\service\adobelmsvc.exe
+C:\Program Files\RustDesk\RustDesk.exe

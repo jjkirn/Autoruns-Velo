@@ -3,5 +3,9 @@
 # autoruns.sqlite) and edit. Ignored entries are hidden by default and come back
 # with the "Show ignored" switch on the page.
 #
+# Prefer one line per specific file. A folder wildcard such as
+# c:\program files\7-zip\* also hides anything unsigned that is dropped into
+# that folder later, which is the case this page exists to catch.
+#
 # c:\tools\my-inhouse-script.exe
-# c:\program files\7-zip\*
+# c:\program files\7-zip\7z.dll
