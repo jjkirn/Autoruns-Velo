@@ -24,4 +24,4 @@ C:\WINDOWS\system32\xvidvfw.dll	#legacy video software to encode and decode MPEG
 C:\Program Files\RustDesk\RustDesk.exe  #RustDesk software for Remote Desktop access
 C:\Program Files\AESCrypt\AESCrypt.dll	#official AES Crypt file encryption software for Windows
 C:\Program Files\Npcap\CheckStatus.bat	#legitimate, automated script installed as part of Npcap (by the Nmap Project)
-C:\WINDOWS\system32\pdfcmon.dll	#legitimate monitor Dynamic Link Library (DLL) file developed by pdfforge GmbH as part of the PDFCreator software
+C:\WINDOWS\system32\pdfcmon.dll	#legitimate monitor Dynamic Link Library (DLL) file developed by pdfforge GmbH as part of the PDFCreator softwarei

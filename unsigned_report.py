@@ -26,7 +26,8 @@ Usage:
 
 Optional ignore list (default: unsigned_ignore.txt next to the database): one
 pattern per line, matched case-insensitively against Image Path or Launch String
-with * and ? wildcards. Lines starting with # are comments. Matching entries are
+with * and ? wildcards. Lines starting with # are comments, and so is anything
+after whitespace followed by # at the end of a pattern line. Matching entries are
 hidden by default and shown again with the "Show ignored" switch.
 """
 
@@ -66,8 +67,10 @@ def load_patterns(path):
     pats = []
     p = Path(path)
     if p.exists():
-        for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
-            line = line.strip()
+        # utf-8-sig drops the BOM some Windows editors add to the first line.
+        for line in p.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            # A "#" after whitespace starts a trailing comment.
+            line = re.sub(r"\s+#.*$", "", line.strip()).strip()
             if line and not line.startswith("#"):
                 pats.append(line.lower())
     return pats
