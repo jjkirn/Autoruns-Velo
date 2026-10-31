@@ -6,4 +6,22 @@
 # c:\tools\my-inhouse-script.exe
 c:\program files\7-zip\*
 c:\program files (x86)\common files\adobe systems shared\service\adobelmsvc.exe
-C:\Program Files\RustDesk\RustDesk.exe
+
+# Audio and Video Codecs
+C:\WINDOWS\system32\AC3ACM.acm	#Audio Compression Manager (Dedcode AC-3) - fccHandler
+C:\WINDOWS\system32\alf2cd.acm	#Audio Compression Manager (Decode - ALF2 CD Audio)- NCT Soft
+C:\WINDOWS\system32\DivX.dll	#DivX Video - version 5.0.5.830 - DivXNetworks 2001-2003
+C:\WINDOWS\system32\lagarith.dll	#Lagarith Lossless Video Codec
+C:\WINDOWS\system32\lame.ax	#(LAME Ain't an MP3 Encoder) - MP3 Encoder
+C:\WINDOWS\system32\mcdvd_32.dll	#DV encoder by MainConcept AG 
+C:\WINDOWS\system32\mpg4c32.dll	#Microsoft MPEG-4 Video Code
+C:\WINDOWS\system32\scg726.acm	#legacy Windows audio codec for G.726 audio
+C:\WINDOWS\system32\vct3216.acm	#legacy Windows audio codec developed by Voxware, Inc
+C:\WINDOWS\system32\vp6vfw.dll	#VP6 Video for Windows Codec (developed by On2.com)
+C:\WINDOWS\system32\xvidvfw.dll	#legacy video software to encode and decode MPEG-4 video
+
+# Other
+C:\Program Files\RustDesk\RustDesk.exe  #RustDesk software for Remote Desktop access
+C:\Program Files\AESCrypt\AESCrypt.dll	#official AES Crypt file encryption software for Windows
+C:\Program Files\Npcap\CheckStatus.bat	#legitimate, automated script installed as part of Npcap (by the Nmap Project)
+C:\WINDOWS\system32\pdfcmon.dll	#legitimate monitor Dynamic Link Library (DLL) file developed by pdfforge GmbH as part of the PDFCreator software
