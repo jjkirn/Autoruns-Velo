@@ -38,6 +38,6 @@ C:\WINDOWS\system32\CNMN6PPM.DLL	#Canon BJNP print port monitor
 C:\Program Files (x86)\Incredibuild\Dashboard\Apache24\bin\httpd.exe	#Incredibuild dashboard web server (Apache)
 C:\mongodb\bin\mongod.exe	#MongoDB service
 
-# Not ignored yet - verify first (remove the leading # once checked)
-#C:\Program Files (x86)\MSI\MSI Remind Manager\MSISCMTsk.exe	#signer shows as "Application"
-#C:\WINDOWS\system32\pdf995mon64.dll	#PDF995 print monitor, no signer name
+# Misc - verified by jjk
+C:\Program Files (x86)\MSI\MSI Remind Manager\MSISCMTsk.exe	#MSI Remind Manager software by Micro-Star International (MSI)
+C:\WINDOWS\system32\pdf995mon64.dll	#legitimate dynamic link library (DLL) file associa
