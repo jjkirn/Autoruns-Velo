@@ -19,5 +19,12 @@ cd "$DIR" || exit 1
   "$DIR/.venv/bin/python3" unsigned_report.py \
     --db "$DIR/autoruns.sqlite" \
     --out "$DIR/reports/unsigned.html"
+  # Publish the 4 report pages to nginx's docroot so they're reachable at
+  # http://velo/autoruns/... from any device, not just via RustDesk/local file.
+  mkdir -p /var/www/html/autoruns
+  cp "$DIR/reports/chart.html" "$DIR/reports/delta.html" \
+     "$DIR/reports/history.html" "$DIR/reports/unsigned.html" \
+     /var/www/html/autoruns/
   echo "=== exit code $rc ==="
 } >> "$DIR/nightly.log" 2>&1
+
